@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>WebAssemblyOS</title>
+</head>
+
+<body>
+    <p>Hello, WebAssemblyOS!</p>
+
+    <script>
+        // ISR values
+        const TIM_IRQ = 0;
+        const KEY_IRQ = 1;
+
+        // initialize structures
+        var memory = new WebAssembly.Memory({
+            initial: 256,
+            maximum: 512
+        });
+        var exports;
+
+        // load the operating system
+        WebAssembly.instantiateStreaming(fetch("index.wasm"), {
+            js: {
+                mem: memory
+            },
+            env: {
+                trace: (channel, data) => console.log(Date.now(), ':', channel, ':', data)
+            }
+        }).then(results => {
+            exports = results.instance.exports;
+            memory = exports.memory;
+
+            // initialize
+            exports.main();
+
+            // systick
+            setInterval(() => exports.irq_handler(TIM_IRQ), 1000);
+
+            // keyboard press
+            window.onkeypress = (e) => {
+                // write in memory
+                (new Uint32Array(memory.buffer))[1000] = e.keyCode;
+
+                // invoke IRQ
+                exports.irq_handler(KEY_IRQ);
+            };
+        });
+    </script>
+</body>
+
+</html>
